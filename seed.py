@@ -148,7 +148,7 @@ def rating_seed(sig_id):
                 'timespan': time,
                 'ratingName': name,
                 'ratingText': text,
-                'sigId': sig_id,
+                'sigId': [ sig_id ],
         })
         # update local store so don't repeat seed
         ratings.append(rating_id)
@@ -191,16 +191,16 @@ def candidate_ratings_seed():
                         for category in categories.iter('category'):
                             category_id = category.find('categoryId').text
                             rating_categories.insert({
-                                'ratingId' : rating_id,
-                                'categoryId': category_id,
+                                'ratingId' : [ rating_id ],
+                                'categoryId': [ category_id ],
                             })
 
                     # write the candidate's rating info
                     print('inserting ratings for candidateId ' + candidate_id)
                     scores_table.insert({
-                        'ratingId': rating_id,
-                        'sigId': sig_id,
-                        'candidateId': candidate_id,
+                        'ratingId': [ rating_id ],
+                        'sigId': [ sig_id ],
+                        'candidateId': [ candidate_id ],
                         'score': score,
                         'name': name,
                         'text': text,
@@ -337,7 +337,7 @@ def rating_categories_cleanup():
 # 1. clear these tables via air table: elections, running, elected, sigs, ratings, rating_categories, scores
 # 2. remove comments from these functions and 'run python seed.py' in terminal
 # election_seed()
-candidate_seed()
+# candidate_seed()
 candidate_ratings_seed()
 rating_categories_cleanup()
 

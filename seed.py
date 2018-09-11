@@ -245,6 +245,12 @@ def candidate_seed():
             election_district = candidate.find('electionDistrictName').text
             election_district_id = candidate.find('electionDistrictId').text
             election_state_id = candidate.find('electionStateId').text
+            office_name = candidate.find('officeName').text # 'State House'
+            office_district = candidate.find('officeDistrictName').text
+            office_district_id = candidate.find('officeDistrictId').text # '20496'
+            office_state_id = candidate.find('officeStateId').text
+            office_status = candidate.find('officeStatus').text # 'active'
+            office_parties = candidate.find('officeParties').text
         
             # get candidate's detailed bio
             print('getting candidate detailed bio for candidateId ' + candidate_id)
@@ -259,20 +265,14 @@ def candidate_seed():
             first_name = candidate.find('firstName').text
             last_name = candidate.find('lastName').text
 
-            # if office data, capture & write it
+            # if office data, capture additional office data from bio & write it
             office = root.find('office')
             in_office = 'true' if office else ''
-            office_parties = office.find('parties').text if in_office else ''
             title = office.find('title').text if in_office else '' # 'Senator'
-            name = office.find('name').text if in_office else '' # 'U.S. Senate'
             first_elect = office.find('firstElect').text if in_office else ''
             next_elect = office.find('nextElect').text if in_office else '' # 2018
             term_start = office.find('termStart').text if in_office else '' # 11/10/1992
             term_end = office.find('termEnd').text if in_office else ''
-            district = office.find('district').text if in_office else '' # 'Senior Seat'
-            district_id = office.find('districtId').text if in_office else '' # 20496
-            state_id = office.find('stateId').text if in_office else ''
-            status = office.find('status').text if in_office else '' # 'active'
 
             # if female, write to database
             if is_female:
@@ -292,17 +292,17 @@ def candidate_seed():
                     'electionOfficeId' : election_office_type_id,
                     'electionDate': election_date,
                     'inOffice' : in_office,
-                    'parties' : office_parties,
                     'title' : title,
-                    'name' : name,
+                    'officeParties' : office_parties,
+                    'officeName' : office_name,
                     'firstElect' : first_elect,
                     'nextElect' : next_elect,
                     'termStart' : term_start,
                     'termEnd' : term_end,
-                    'district' : district,
-                    'districtId' : district_id,
-                    'stateId': state_id,
-                    'status' : status,
+                    'officeDistrict' : office_district,
+                    'officeDistrictId' : office_district_id,
+                    'officeStateId': office_state_id,
+                    'officeStatus' : office_status,
                     })
 
 

@@ -32,8 +32,7 @@ candidate_ratings_url = base_vote_url + '/Rating.getCandidateRating?key=' + vote
 
 states_table = Airtable(woman_up, 'states', air_key)
 elections_table = Airtable(woman_up, 'elections', air_key)
-running_table = Airtable(woman_up, 'running', air_key)
-elected_table = Airtable(woman_up, 'elected', air_key)
+candidates_table = Airtable(woman_up, 'candidates', air_key)
 category_table = Airtable(woman_up, 'categories', air_key)
 sigs_table = Airtable(woman_up, 'sigs', air_key)
 ratings_table = Airtable(woman_up, 'ratings', air_key)
@@ -79,7 +78,7 @@ def get_rating_ids():
 
 def get_candidate_ids():
     candidates = []
-    candidates_records = running_table.get_all()
+    candidates_records = candidates_table.get_all()
     for candidate in candidates_records:
         candidate_id = candidate['fields']['candidateId']
         candidates.append(candidate_id)
@@ -142,13 +141,14 @@ def rating_seed(sig_id):
         time = rating.find('timespan').text
         name = rating.find('ratingName').text
         text = rating.find('ratingText').text
-        print('inserting rating info for ' + rating_id)
-        ratings_table.insert({
-            'ratingId': rating_id,
-            'timespan': time,
-            'ratingName': name,
-            'ratingText': text,
-            'sigId': sig_id,
+        if year in time or previous_year in time:
+            print('inserting rating info for ' + rating_id)
+            ratings_table.insert({
+                'ratingId': rating_id,
+                'timespan': time,
+                'ratingName': name,
+                'ratingText': text,
+                'sigId': sig_id,
         })
         # update local store so don't repeat seed
         ratings.append(rating_id)
@@ -223,6 +223,7 @@ def election_seed():
 
 def candidate_seed():
     elections = elections_table.get_all()
+    # iterate through all current elections
     for election in elections:
         election_id = election['fields']['electionId']
         print('getting candidates for electionId ' + election_id)
@@ -230,31 +231,52 @@ def candidate_seed():
         r = get_request(candidates_election_url, params)
         root = ElementTree.fromstring(r.content)
         for candidate in root.iter('candidate'):
-            # get information from election profile
+
+            # capture candidate election information
             candidate_id = candidate.find('candidateId').text
-            first_name = candidate.find('firstName').text
-            last_name = candidate.find('lastName').text
-            election_parties = candidate.find('electionParties').text
-            election_status = candidate.find('electionStatus').text
             election_stage = candidate.find('electionStage').text
             election_office = candidate.find('electionOffice').text
             election_office_id = candidate.find('electionOfficeId').text
             election_state_id = candidate.find('electionStateId').text
             election_office_type_id = candidate.find('electionOfficeTypeId').text
             election_date = candidate.find('electionDate').text
-            photo = candidate.find('photo').text
-            
-            # get information from detailed bio
-            print('getting candidate detailed bio for electionId ' + candidate_id)
+            election_parties = candidate.find('electionParties').text
+            election_status = candidate.find('electionStatus').text
+            election_district = candidate.find('electionDistrictName').text
+            election_district_id = candidate.find('electionDistrictId').text
+            election_state_id = candidate.find('electionStateId').text
+        
+            # get candidate's detailed bio
+            print('getting candidate detailed bio for candidateId ' + candidate_id)
             params = { 'candidateId': candidate_id }
             r = get_request(candidate_bio_url, params)
             root = ElementTree.fromstring(r.content)
-        
-            is_female = root.find('candidate').find('gender').text == 'Female'
+            
+            # capture candidate bio data
+            candidate = root.find('candidate')
+            is_female = candidate.find('gender').text == 'Female'
+            photo = candidate.find('photo').text
+            first_name = candidate.find('firstName').text
+            last_name = candidate.find('lastName').text
 
-            # if female, seed to database
-            if is_female(root):
-                running_table.insert({
+            # if office data, capture & write it
+            office = root.find('office')
+            in_office = 'true' if office else ''
+            office_parties = office.find('parties').text if in_office else ''
+            title = office.find('title').text if in_office else '' # 'Senator'
+            name = office.find('name').text if in_office else '' # 'U.S. Senate'
+            first_elect = office.find('firstElect').text if in_office else ''
+            next_elect = office.find('nextElect').text if in_office else '' # 2018
+            term_start = office.find('termStart').text if in_office else '' # 11/10/1992
+            term_end = office.find('termEnd').text if in_office else ''
+            district = office.find('district').text if in_office else '' # 'Senior Seat'
+            district_id = office.find('districtId').text if in_office else '' # 20496
+            state_id = office.find('stateId').text if in_office else ''
+            status = office.find('status').text if in_office else '' # 'active'
+
+            # if female, write to database
+            if is_female:
+                candidates_table.insert({
                     'candidateId' : candidate_id,
                     'photo': photo,
                     'firstName' : first_name,
@@ -262,53 +284,62 @@ def candidate_seed():
                     'electionParties' : election_parties,
                     'electionStatus' : election_status,
                     'electionStage' : election_stage,
+                    'electionDistrict' : election_district,
+                    'electionDistrictId' : election_district_id,
+                    'electionStateId': election_state_id,
                     'electionOffice' : election_office,
-                    'electionOfficeId' : election_office_id,
-                    'electionStateId' : election_state_id,
-                    'electionOfficeTypeId' : election_office_type_id,
+                    'electionOfficeTypeId' : election_office_id,
+                    'electionOfficeId' : election_office_type_id,
                     'electionDate': election_date,
+                    'inOffice' : in_office,
+                    'parties' : office_parties,
+                    'title' : title,
+                    'name' : name,
+                    'firstElect' : first_elect,
+                    'nextElect' : next_elect,
+                    'termStart' : term_start,
+                    'termEnd' : term_end,
+                    'district' : district,
+                    'districtId' : district_id,
+                    'stateId': state_id,
+                    'status' : status,
                     })
-            
-                # get office data from detailed bio
-                office = root.find('office')
-                if (office):
-                    office_parties = office.find('officeParties').text
-                    title = office.find('title').text # 'Senator'
-                    name = office.find('name').text # 'U.S. Senate'
-                    first_elect = office.find('firstElect').text
-                    next_elect = office.find('nextElect').text # 2018
-                    term_start = office.find('termStart').text # 11/10/1992
-                    term_end = office.find('termEnd').text
-                    district = office.find('district').text # 'Senior Seat'
-                    district_id = office.find('districtId').text # 20496
-                    state_id = office.find('stateId').text
-                    status = office.find('status').text # 'active'
 
-                    elected_table.insert({
-                        'candidateId' : candidate_id,
-                        'officeParties' : office_parties,
-                        'title' : title,
-                        'name' : name,
-                        'firstElect' : first_elect,
-                        'nextElect' : next_elect,
-                        'termStart' : term_start,
-                        'termEnd' : term_end,
-                        'district' : district,
-                        'districtId' : district_id,
-                        'stateId': state_id,
-                        'status' : status,
-                    })
-            
 
-# TODO: create contact table and seed via separate method
+# clean up functions
+
+def rating_categories_cleanup():
+    ''' because votesmart provides multiple category / rating associations, run this to clean up rating_categories table '''
+
+    all_rating_categories = rating_categories.get_all()
+    print(all_rating_categories)
+    uniques = dict()
+    for record in all_rating_categories:
+        airtable_id = record['id']
+        record_id = record['fields']['id']
+        rating_id = record['fields']['ratingId'][0]
+        category_id = record['fields']['categoryId'][0]
+        # determine uniqueness of record
+        if rating_id not in uniques:
+            uniques[rating_id] = [ category_id ]
+        elif rating_id in uniques and category_id not in uniques[rating_id]:
+            uniques[rating_id].append(category_id)
+        else:
+            # record not unique, delete from table
+            print('deleting record from rating_categories table')
+            rating_categories.delete(airtable_id)
+
+# TODO:
+# 1. add method to get address information for candidates and add to table
 
 # HOW TO REGULARLY UPDATE WOMAN UP DATABASE FOR NEW ELECTIONS, CANDIDATES AND/OR SCORES:
 
 # 1. clear these tables via air table: elections, running, elected, sigs, ratings, rating_categories, scores
 # 2. remove comments from these functions and 'run python seed.py' in terminal
-election_seed()
+# election_seed()
 candidate_seed()
 candidate_ratings_seed()
+rating_categories_cleanup()
 
 
 

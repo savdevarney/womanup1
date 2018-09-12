@@ -358,7 +358,9 @@ def candidate_seed():
             term_start = office.find('termStart').text if in_office else '' # 11/10/1992
             term_end = office.find('termEnd').text if in_office else ''
 
-            candidate_record_object = {
+            # TODO: also grab lastElect
+
+            candidate_record_obj = {
                     'candidateId' : candidate_id,
                     'photo': photo,
                     'firstName' : first_name,
@@ -379,22 +381,22 @@ def candidate_seed():
 
             # inject linked records conditionally (cannot be None)
             if election_district_id:
-                candidate_record_object['electionDistrictId'] = [ get_district_id(election_district_id) ]
+                candidate_record_obj['electionDistrictId'] = [ get_district_id(election_district_id) ]
             if election_state_id:
-                candidate_record_object['electionStateId'] =  [ get_state_id(election_state_id) ]
+                candidate_record_obj['electionStateId'] =  [ get_state_id(election_state_id) ]
             if election_office_id:
-                candidate_record_object['electionOfficeId'] = [ get_office_id(election_office_id) ]
+                candidate_record_obj['electionOfficeId'] = [ get_office_id(election_office_id) ]
             if office_id:
-                candidate_record_object['officeId'] = [ get_office_id(office_id) ]
+                candidate_record_obj['officeId'] = [ get_office_id(office_id) ]
             if office_district_id:
-                candidate_record_object['officeDistrictId'] = [ get_district_id(office_district_id) ]
+                candidate_record_obj['officeDistrictId'] = [ get_district_id(office_district_id) ]
             if office_state_id:
-                candidate_record_object['officeStateId'] = [ get_state_id(office_state_id) ]
+                candidate_record_obj['officeStateId'] = [ get_state_id(office_state_id) ]
             
             # if female, write to database
             if is_female:
                 print('inserting candidate record candidate: ' + str(candidate_id))
-                candidates_table.insert(candidate_record_object)
+                candidates_table.insert(candidate_record_obj)
 
 
 def candidate_address_seed():
@@ -504,16 +506,22 @@ def regular_update_prep():
 # 3. run 'python seed.py' in terminal.
 
 # office_seed()
+# print('OFFICE SEED DONE')
 # state_seed()
+# print('STATE SEED DONE')
 # district_seed()
+# print('DISTRICT SEED DONE')
 # category_seed()
+# print('CATEGORY SEED DONE')
 
 # HOW TO REGULARLY UPDATE A WOMAN UP DATABASE:
 # suggest running this script at least once per week to capture new elections and candidate information
 # 1. uncomment the below functions.
 # 2. run 'python seed.py' in terminal.
 # regular_update_prep()
+print('TABLES CLEARED')
 # election_seed()
+print('ELECTION SEED DONE')
 candidate_seed()
 print('CANDIDATE SEED DONE')
 candidate_address_seed()
@@ -523,6 +531,20 @@ print('CANDIDATE RATINGS SEED DONE')
 rating_categories_cleanup()
 print('CATEGORIES CLEANUP DONE')
 print('WOMAN UP SEEDING COMPLETE')
+
+
+'''
+
+TODO:
+1. delete office table and test the office write method (reading from csv)
+2. update prep method to delete ALL tables and test entire script - run over night
+3. above works for now, but when db is live we will want to update a record if it exists and insert if it doesn't
+4. start working with data in Angular from airtable and determine if you need any db structre refinements
+5. create table with summary stats (total # women, # running, # lost, # withdrawn, etc. ) and methods to write info as last step of seed.py
+
+'''
+
+
 
 
 

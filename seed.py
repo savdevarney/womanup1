@@ -21,6 +21,7 @@ previous_year = '2017'
 # VOTE SMART END POINTS
 
 base_vote_url = 'http://api.votesmart.org'
+offices_url = base_vote_url + '/Office.getOfficesByType?key=' + vote_key
 states_url = base_vote_url + '/State.getStateIDs?key=' + vote_key
 districts_url = base_vote_url + '/District.getByOfficeState?key=' + vote_key
 elections_state_year_url = base_vote_url + '/Election.getElectionByYearState?key=' + vote_key
@@ -36,6 +37,7 @@ candidate_address_url = base_vote_url + '/Address.getOfficeWebAddress?key=' + vo
 
 states_table = Airtable(woman_up, 'states', air_key)
 offices_table = Airtable(woman_up, 'offices', air_key)
+office_types_table = Airtable(woman_up, 'office_types', air_key)
 districts_table = Airtable(woman_up, 'districts', air_key)
 elections_table = Airtable(woman_up, 'elections', air_key)
 candidates_table = Airtable(woman_up, 'candidates', air_key)
@@ -136,23 +138,31 @@ def get_election_id(election_id):
 def get_office_id(office_id):
     return offices_table.match('officeId', office_id)['id']
 
+def get_office_type_id(office_type_id):
+    return office_types_table.match('officeTypeId', office_type_id)['id']
+
 # METHODS FOR FIRST SEED (mostly static, only run when setting up)
 
 def office_seed():
-    with open('offices.csv') as csv_file:
-        row_count = 0
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        for row in csv_reader:
-            office_data_obj = {}
-            if row_count == 0:
-                continue
-            else:
-                office_data_obj['officeId'] = row[0]
-                office_data_obj['officeTypeId'] = row[1]
-                office_data_obj['name'] = row[2]
-                row_count += 1
-            
-            offices_table.insert(office_data_obj)
+    for office_type_id in ['P', 'C', 'G', 'S', 'K', 'L', 'J', 'M', 'N', 'H' ]:
+        params = { 'officeTypeId' : office_type_id }
+        r = get_request(offices_url, params)
+        root = ElementTree.fromstring(r.content)
+        for office in root.iter('office'):
+            office_id = office.find('officeId').text
+            office_type_id = office.find('officeTypeId').text
+            office_level_id = office.find('officeLevelId').text
+            office_branch_id = office.find('officeBranchId').text
+            office_name = office.find('name').text
+
+            offices_table.insert({
+                'officeId' : office_id,
+                'officeTypeId' : office_type_id,
+                'officeLevelId' : office_level_id,
+                'officeBranchId' : office_branch_id,
+                'officeName' : office_name,
+            })
+
 
 def state_seed():
     r = requests.get(states_url)
@@ -175,20 +185,21 @@ def category_seed():
 
 def district_seed():
     for state in states:
+        state_id_record = get_state_id(state)
         for office in offices:
+            office_id_record = get_office_id(office)
             params = { 'officeId' : office, 'stateId' : state }
             r = get_request(districts_url, params)
             root = ElementTree.fromstring(r.content)
             for district in root.iter('district'):
                 district_id = district.find('districtId').text
                 district_name = district.find('name').text
-                state_id = district.find('stateId').text
-                print('inserting record for ' + district_name + ' in ' + state_id )
+                print('inserting record for ' + district_name + ' in ' + state )
                 districts_table.insert({
                     'districtId' : district_id,
                     'districtName' : district_name,
-                    'officeId' : [ get_office_id(office) ],
-                    'stateId' : [ get_state_id(state_id) ],
+                    'officeId' : [ office_id_record ],
+                    'stateId' : [ state_id_record ],
                 })
 
 # METHODS FOR REGULAR UPDATING
@@ -237,6 +248,7 @@ def rating_seed(sig_id):
 def candidate_ratings_seed():
     candidate_ids = get_candidate_ids()
     for candidate_id in candidate_ids:
+        candidate_id_record = get_candidate_id(candidate_id)
         print('getting ratings for candidateId ' + candidate_id)
         params = {'candidateId': candidate_id}
         r = get_request(candidate_ratings_url, params)
@@ -281,7 +293,7 @@ def candidate_ratings_seed():
                     score_data_obj = {
                         'ratingId': [ get_rating_id(rating_id) ],
                         'sigId': [ get_sig_id(sig_id) ],
-                        'candidateId': [ get_candidate_id(candidate_id) ],
+                        'candidateId': [ candidate_id_record ],
                         'score': score,
                         'name': name,
                         'text': text,
@@ -292,6 +304,7 @@ def candidate_ratings_seed():
 
 def election_seed():
     for state in states:
+        state_record = get_state_id(state)
         print('getting elections for state ' + state)
         params = { 'stateId': state, 'year': year }
         r = get_request(elections_state_year_url, params)
@@ -299,21 +312,24 @@ def election_seed():
         for election in root.iter('election'):
             election_id = election.find('electionId').text
             election_name = election.find('name').text
-            election_record = get_election_id(election_id)
+            office_type_id = election.find('officeTypeId').text
             election_data_obj = {
                 'electionId': election_id,
                 'name': election_name,
-                'stateId': [ get_state_id(state) ],
+                'stateId': [ state_record ],
+                'officeTypeId': [ get_office_type_id(office_type_id) ],
                 }
 
             print('inserting election record for election: ' + str(election_id))
             elections_table.insert(election_data_obj)
 
 def candidate_seed():
+    # TODO: refactor into iterator
     elections = elections_table.get_all()
     # iterate through all current elections
     for election in elections:
         election_id = election['fields']['electionId']
+        election_id_record = election['id']
         print('getting candidates for electionId ' + election_id)
         params = { 'electionId': election_id }
         r = get_request(candidates_election_url, params)
@@ -354,6 +370,7 @@ def candidate_seed():
             in_office = 'true' if office else ''
             title = office.find('title').text if in_office else '' # 'Senator'
             first_elect = office.find('firstElect').text if in_office else ''
+            last_elect = office.find('lastElect').text if in_office else ''
             next_elect = office.find('nextElect').text if in_office else '' # 2018
             term_start = office.find('termStart').text if in_office else '' # 11/10/1992
             term_end = office.find('termEnd').text if in_office else ''
@@ -361,6 +378,7 @@ def candidate_seed():
             # TODO: also grab lastElect
 
             candidate_record_obj = {
+                    'electionId' : [ election_id_record ],
                     'candidateId' : candidate_id,
                     'photo': photo,
                     'firstName' : first_name,
@@ -373,6 +391,7 @@ def candidate_seed():
                     'title' : title,
                     'officeParties' : office_parties,
                     'firstElect' : first_elect,
+                    'lastElect' : last_elect,
                     'nextElect' : next_elect,
                     'termStart' : term_start,
                     'termEnd' : term_end,
@@ -402,6 +421,7 @@ def candidate_seed():
 def candidate_address_seed():
     candidate_ids = get_candidate_ids()
     for candidate_id in candidate_ids:
+        candidate_id_record = get_candidate_id(candidate_id)
         params = { 'candidateId' : candidate_id }
         r = get_request(candidate_address_url, params)
         root = ElementTree.fromstring(r.content)
@@ -411,14 +431,14 @@ def candidate_address_seed():
             address = address.find('webAddress').text
             
             address_data_obj = {
-                'candidateId' : [ get_candidate_id(candidate_id) ],
+                'candidateId' : [ candidate_id_record ],
                 'webAddressTypeId' : address_type_id,
                 'webAddressType' : address_type,
                 'webAddress' : address,
             }
    
             print('inserting candidate address record for candidate: ' + str(candidate_id))
-            scores_table.insert(address_data_obj)
+            addresses_table.insert(address_data_obj)
 
 # CLEAN UP METHODS
 
@@ -444,61 +464,14 @@ def rating_categories_cleanup():
             rating_categories.delete(airtable_id)
 
 def regular_update_prep():
-    # delete election table
-    election_ids = []
-    elections_records = elections_table.get_all()
-    for election in election_records:
-        election_id = election['id']
-        election_ids.append(election_id)
-    elections_table.batch_delete(election_ids)
-
-    # delete candidates table
-    candidate_ids = []
-    candidate_records = candidates_table.get_all()
-    for candidate in candidate_records:
-        candidate_id = candidate['id']
-        candidate_ids.append(candidate_id)
-    candidates_table.batch_delete(candidate_ids)
-
-    # delete addresses table
-    address_ids = []
-    address_records = addresses_table.get_all()
-    for address in address_records:
-        address_id = address['id']
-        address_ids.append(address_id)
-    addresses_table.batch_delete(address_ids)
-
-    # delete sigs table
-    sig_ids = []
-    sig_records = sigs_table.get_all()
-    for sig in sig_records:
-        sig_id = sig['id']
-        sig_ids.append(sig_id)
-    sigs_table.batch_delete(sig_ids)
-
-    # delete ratings table
-    rating_ids = []
-    rating_records = ratings_table.get_all()
-    for rating in rating_records:
-        rating_id = rating['id']
-        rating_ids.append(election_id)
-    rating_table.batch_delete(rating_ids)
-
-    # delete rating_categories table
-    rat_cats_ids = []
-    rat_cats_records = rating_categories.get_all()
-    for rat_cats in rat_cat_records:
-        rat_cat_id = rat_cat['id']
-        rat_cat_ids.append(election_id)
-    rating_categories.batch_delete(election_ids)
-
-    # delete scores table
-    score_ids = []
-    score_records = scores_table.get_all()
-    for score in scores_table:
-        score_id = score['id']
-        score_ids.append(election_id)
-    scores_table.batch_delete(election_ids)
+    tables_to_delete = [elections_table, candidates_table, addresses_table, sigs_table, ratings_table, rating_categories, scores_table]
+    for table in tables_to_delete: 
+    record_ids = []
+        records = table.get_all()
+        for record in records:
+            record_id = record['id']
+            record_ids.append(election_id)
+        table.batch_delete(record_ids)
 
 # HOW TO SEED A NEW WOMAN UP DATABASE: 
 # 1. change year and previous_year variables accordingly.
@@ -519,28 +492,26 @@ def regular_update_prep():
 # 1. uncomment the below functions.
 # 2. run 'python seed.py' in terminal.
 # regular_update_prep()
-print('TABLES CLEARED')
+# print('TABLES CLEARED')
 # election_seed()
-print('ELECTION SEED DONE')
-candidate_seed()
-print('CANDIDATE SEED DONE')
-candidate_address_seed()
-print('CANDIDATE ADDRESS SEED DONE')
-candidate_ratings_seed()
-print('CANDIDATE RATINGS SEED DONE')
-rating_categories_cleanup()
-print('CATEGORIES CLEANUP DONE')
-print('WOMAN UP SEEDING COMPLETE')
+# print('ELECTION SEED DONE')
+# candidate_seed()
+# print('CANDIDATE SEED DONE')
+# candidate_address_seed()
+# print('CANDIDATE ADDRESS SEED DONE')
+# candidate_ratings_seed()
+# print('CANDIDATE RATINGS SEED DONE')
+# rating_categories_cleanup()
+# print('CATEGORIES CLEANUP DONE')
+# print('WOMAN UP SEEDING COMPLETE')
 
 
 '''
 
 TODO:
-1. delete office table and test the office write method (reading from csv)
-2. update prep method to delete ALL tables and test entire script - run over night
-3. above works for now, but when db is live we will want to update a record if it exists and insert if it doesn't
-4. start working with data in Angular from airtable and determine if you need any db structre refinements
-5. create table with summary stats (total # women, # running, # lost, # withdrawn, etc. ) and methods to write info as last step of seed.py
+- clearing tables and reseeding for now, but when db is live we will want to update a record if it exists and insert if it doesn't
+- start working with data in Angular from airtable and determine if you need any db structre refinements
+- create table with summary stats (total # women, # running, # lost, # withdrawn, etc. ) and methods to write info as last step of seed.py
 
 '''
 

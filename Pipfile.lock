@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "010f39e6cfbf2f7f87d7ab4becf878b2a23b85c679bfeaa7fc19f77dc639b8e8"
+            "sha256": "df61a136525bec29e8cbadca6d4eadc2c2e91474b5645c3cfd044ff14d635484"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -45,13 +45,6 @@
             ],
             "version": "==2.7"
         },
-        "jellyfish": {
-            "hashes": [
-                "sha256:887a9a49d0caee913a883c3e7eb185f6260ebe2137562365be422d1316bd39c9",
-                "sha256:d0b22034df56d5faa34928457655722acf385d122da59c2cf7f4acd6bd49ea8b"
-            ],
-            "version": "==0.5.6"
-        },
         "requests": {
             "hashes": [
                 "sha256:63b52e3c866428a224f97cab011de738c36aec0185aa91cfacd418b5d58911d1",
@@ -74,13 +67,6 @@
             ],
             "markers": "python_version != '3.0.*' and python_version < '4' and python_version != '3.2.*' and python_version >= '2.6' and python_version != '3.3.*' and python_version != '3.1.*'",
             "version": "==1.23"
-        },
-        "us": {
-            "hashes": [
-                "sha256:09dc9ba763e2e4399e6a042104f3e415a7de6bfa4df6f557b4f19e3ba9a22fda"
-            ],
-            "index": "pypi",
-            "version": "==1.0.0"
         }
     },
     "develop": {}

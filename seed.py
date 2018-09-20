@@ -7,9 +7,6 @@ from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
 from xml.etree import ElementTree
-from pprint import pprint
-
-import csv
 
 
 vote_key = os.environ['VOTE_SMART_API_KEY']

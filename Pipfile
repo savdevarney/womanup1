@@ -6,7 +6,6 @@ name = "pypi"
 [packages]
 requests = "*"
 airtable-python-wrapper = "*"
-us = "*"
 
 [dev-packages]
 
